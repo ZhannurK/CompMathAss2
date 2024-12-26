@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def cramer_method(coeff_matrix, const_terms):
     det = np.linalg.det(coeff_matrix)
     if abs(det) < 1e-10:

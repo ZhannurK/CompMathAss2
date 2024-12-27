@@ -1,3 +1,5 @@
+import numpy as np
+
 def determinant(matrix):
     if len(matrix) == 1:
         return matrix[0][0]
@@ -14,8 +16,6 @@ def matrix_copy(matrix):
 
 def cramer_method(A, b):
     det_A = determinant(A)
-    if det_A == 0:
-        raise ValueError("The determinant of A is zero. Cramer's method cannot be applied.")
     n = len(b)
     x = [0] * n
     for i in range(n):
@@ -27,45 +27,63 @@ def cramer_method(A, b):
     return x
 
 def gauss_elimination(A, b):
+    A = np.array(A, dtype=float)
+    b = np.array(b, dtype=float)
     n = len(b)
     for k in range(n - 1):
         for i in range(k + 1, n):
-            factor = A[i][k] / A[k][k]
-            for j in range(k, n):
-                A[i][j] -= factor * A[k][j]
+            factor = A[i, k] / A[k, k]
+            A[i, k:] -= factor * A[k, k:]
             b[i] -= factor * b[k]
 
-    x = [0] * n
+    x = np.zeros(n)
     for i in range(n - 1, -1, -1):
-        sum_ax = sum(A[i][j] * x[j] for j in range(i + 1, n))
-        x[i] = (b[i] - sum_ax) / A[i][i]
+        x[i] = (b[i] - np.dot(A[i, i + 1:], x[i + 1:])) / A[i, i]
     return x
 
-def jacobi_method(A, b, tol=1e-5, max_iterations=100):
+def jacobi(a, b, n_iter=150, tol=1e-6):
+    a = np.array(a, dtype=float)
+    b = np.array(b, dtype=float)
     n = len(b)
-    x = [0] * n
-    for _ in range(max_iterations):
-        x_new = [0] * n
+    x = np.zeros(n)
+    x_new = np.zeros(n)
+    for m in range(n_iter):
         for i in range(n):
-            sum_ax = sum(A[i][j] * x[j] for j in range(n) if j != i)
-            x_new[i] = (b[i] - sum_ax) / A[i][i]
-        if max(abs(x_new[i] - x[i]) for i in range(n)) < tol:
+            sigma = sum(a[i][j] * x[j] for j in range(n) if i != j)
+            x_new[i] = (b[i] - sigma) / a[i, i]
+        if np.linalg.norm(x_new - x, ord=np.inf) < tol:
+            print(f"Jacobi method converged in {m + 1} iterations.")
             return x_new
-        x = x_new
-    raise ValueError("Jacobi method did not converge within the maximum number of iterations.")
+        x = x_new.copy()
+    raise ValueError("Jacobi method did not converge.")
 
-def gauss_seidel_method(A, b, tol=1e-5, max_iterations=100):
+def gauss_seidel(a, b, n_iterations=150, tolerance=1e-4):
+    a = np.array(a, dtype=float)
+    b = np.array(b, dtype=float)
     n = len(b)
-    x = [0] * n
-    for _ in range(max_iterations):
-        x_new = x[:]
+    x = np.zeros(n)
+    for itr in range(1, n_iterations + 1):
+        x_old = x.copy()
         for i in range(n):
-            sum_ax = sum(A[i][j] * x_new[j] for j in range(n) if j != i)
-            x_new[i] = (b[i] - sum_ax) / A[i][i]
-        if max(abs(x_new[i] - x[i]) for i in range(n)) < tol:
-            return x_new
-        x = x_new
-    raise ValueError("Gauss-Seidel method did not converge within the maximum number of iterations.")
+            sigma = sum(a[i, j] * x[j] for j in range(n) if i != j)
+            x[i] = (b[i] - sigma) / a[i, i]
+        if np.linalg.norm(x - x_old, ord=np.inf) < tolerance:
+            print(f"Gauss-Seidel method converged in {itr} iterations.")
+            return x
+    raise ValueError("Gauss-Seidel method did not converge.")
+
+
+def reorder_rows_for_diagonal_dominance(A, B):
+    n = len(A[0])
+    for i in range(n):
+        # Find the row with the largest absolute diagonal element in column i
+        max_row = max(range(i, n), key=lambda r: abs(A[r][i]))
+
+        # Swap rows in both A and B
+        if i != max_row:
+            A[i], A[max_row] = A[max_row], A[i]
+            B[i], B[max_row] = B[max_row], B[i]
+    return A, B
 
 A = [
     [3, -5, 47, 20],
@@ -76,23 +94,22 @@ A = [
 
 b = [18, 26, 34, 82]
 
-try:
-    x_cramer = cramer_method(A, b)
-    print("Solution using Cramer's method:", x_cramer)
-except ValueError as e:
-    print(e)
+x_cramer = cramer_method(A, b)
+print("Solution using Cramer's method:", x_cramer)
 
-x_gauss = gauss_elimination(matrix_copy(A), b[:])
+x_gauss = gauss_elimination(A, b)
 print("Solution using Gaussian elimination:", x_gauss)
 
-try:
-    x_jacobi = jacobi_method(A, b)
-    print("Solution using Jacobi method:", x_jacobi)
-except ValueError as e:
-    print(e)
+reorder_rows_for_diagonal_dominance(A, b)
 
 try:
-    x_gauss_seidel = gauss_seidel_method(A, b)
-    print("Solution using Gauss-Seidel method:", x_gauss_seidel)
+    x_jacobi = jacobi(A, b)
+    print(f"Solution using Jacobi method: {x_jacobi}")
 except ValueError as e:
-    print(e)
+    print(f"Jacobi method error: {e}")
+
+try:
+    x_gauss_seidel = gauss_seidel(A, b)
+    print(f"Solution using Gauss-Seidel method: {x_gauss_seidel}")
+except ValueError as e:
+    print(f"Gauss-Seidel method error: {e}")
